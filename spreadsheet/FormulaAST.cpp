@@ -5,6 +5,7 @@
 #include "FormulaParser.h"
 
 #include <cassert>
+#include <charconv>
 #include <cmath>
 #include <memory>
 #include <optional>
@@ -72,7 +73,7 @@ public:
     virtual ~Expr() = default;
     virtual void Print(std::ostream& out) const = 0;
     virtual void DoPrintFormula(std::ostream& out, ExprPrecedence precedence) const = 0;
-    virtual double Evaluate(/*добавьте сюда нужные аргументы*/ args) const = 0;
+    virtual double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const = 0;
 
     // higher is tighter
     virtual ExprPrecedence GetPrecedence() const = 0;
@@ -142,8 +143,21 @@ public:
         }
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/) const override {
-			// Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const override {
+        double tmp;
+        if (type_ == Add) {
+            tmp = lhs_->Evaluate(cell_value_getter) + rhs_->Evaluate(cell_value_getter);
+        } else if (type_ == Subtract) {
+            tmp = lhs_->Evaluate(cell_value_getter) - rhs_->Evaluate(cell_value_getter);
+        } else if (type_ == Multiply) {
+            tmp = lhs_->Evaluate(cell_value_getter) * rhs_->Evaluate(cell_value_getter);
+        } else { // type_ == Divide
+            tmp = lhs_->Evaluate(cell_value_getter) / rhs_->Evaluate(cell_value_getter);  
+        }
+        if (!std::isfinite(tmp)) {
+            throw FormulaError(FormulaError::Category::Arithmetic);
+        }
+        return tmp;
     }
 
 private:
@@ -180,8 +194,12 @@ public:
         return EP_UNARY;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const override {
+        if (type_ == UnaryPlus) {
+            return operand_->Evaluate(cell_value_getter);
+        } else { // type_ == UnaryMinus)
+            return -operand_->Evaluate(cell_value_getter);
+        }
     }
 
 private:
@@ -211,8 +229,30 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // реализуйте метод.
+    double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const override {
+        if (!cell_->IsValid()) {
+            throw FormulaError(FormulaError::Category::Ref);
+        }
+        CellInterface::Value value = cell_value_getter(*cell_);
+
+        // Если значение ячейки является строкой, попытаться привести к double
+        if (std::holds_alternative<std::string>(value)) {
+            std::string str = std::get<std::string>(value);
+            if (str.empty()) {
+                return 0.0;
+            }
+            double numeric_value = 0.0;
+            auto result = std::from_chars(str.data(), str.data() + str.size(), numeric_value);
+            if (result.ec == std::errc() && result.ptr == str.data() + str.size()) {
+                return numeric_value;
+            } else {
+                throw FormulaError(FormulaError::Category::Value);
+            }
+        } else if (std::holds_alternative<FormulaError>(value)) {
+            throw std::get<FormulaError>(value);
+        } else {
+            return std::get<double>(value);
+        }
     }
 
 private:
@@ -237,7 +277,7 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(std::function<CellInterface::Value(Position)>& /*cell_value_getter*/) const override {
         return value_;
     }
 
@@ -365,7 +405,13 @@ FormulaAST ParseFormulaAST(std::istream& in) {
     parser.setErrorHandler(error_handler);
     parser.removeErrorListeners();
 
-    tree::ParseTree* tree = parser.main();
+    tree::ParseTree* tree;
+    try {
+        tree = parser.main();
+    } catch (std::exception& e) {
+        throw FormulaException(e.what());
+    }
+    
     ASTImpl::ParseASTListener listener;
     tree::ParseTreeWalker::DEFAULT.walk(&listener, tree);
 
@@ -391,8 +437,8 @@ void FormulaAST::PrintFormula(std::ostream& out) const {
     root_expr_->PrintFormula(out, ASTImpl::EP_ATOM);
 }
 
-double FormulaAST::Execute(/*добавьте нужные аргументы*/ args) const {
-    return root_expr_->Evaluate(/*добавьте нужные аргументы*/ args);
+double FormulaAST::Execute(std::function<CellInterface::Value(Position)>& cell_value_getter) const {
+    return root_expr_->Evaluate(cell_value_getter);
 }
 
 FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells)

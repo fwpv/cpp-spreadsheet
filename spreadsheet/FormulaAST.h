@@ -23,7 +23,7 @@ public:
     FormulaAST& operator=(FormulaAST&&) = default;
     ~FormulaAST();
 
-    double Execute(/*добавьте нужные аргументы*/ args) const;
+    double Execute(std::function<CellInterface::Value(Position)>& cell_value_getter) const;
     void PrintCells(std::ostream& out) const;
     void Print(std::ostream& out) const;
     void PrintFormula(std::ostream& out) const;
