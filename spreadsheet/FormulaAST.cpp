@@ -144,20 +144,27 @@ public:
     }
 
     double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const override {
-        double tmp;
+        double lhs = lhs_->Evaluate(cell_value_getter);
+        double rhs = rhs_->Evaluate(cell_value_getter);
+        
+        double result;
         if (type_ == Add) {
-            tmp = lhs_->Evaluate(cell_value_getter) + rhs_->Evaluate(cell_value_getter);
+            result = lhs + rhs;
         } else if (type_ == Subtract) {
-            tmp = lhs_->Evaluate(cell_value_getter) - rhs_->Evaluate(cell_value_getter);
+            result = lhs - rhs;
         } else if (type_ == Multiply) {
-            tmp = lhs_->Evaluate(cell_value_getter) * rhs_->Evaluate(cell_value_getter);
+            result = lhs * rhs;
         } else { // type_ == Divide
-            tmp = lhs_->Evaluate(cell_value_getter) / rhs_->Evaluate(cell_value_getter);  
+            constexpr double epsilon = 1.e-30;
+            if (std::abs(rhs) < epsilon) {
+                throw FormulaError(FormulaError::Category::Arithmetic);
+            }
+            result = lhs / rhs;
         }
-        if (!std::isfinite(tmp)) {
+        if (!std::isfinite(result)) {
             throw FormulaError(FormulaError::Category::Arithmetic);
         }
-        return tmp;
+        return result;
     }
 
 private:
@@ -195,10 +202,11 @@ public:
     }
 
     double Evaluate(std::function<CellInterface::Value(Position)>& cell_value_getter) const override {
+        double result = operand_->Evaluate(cell_value_getter);
         if (type_ == UnaryPlus) {
-            return operand_->Evaluate(cell_value_getter);
+            return result;
         } else { // type_ == UnaryMinus)
-            return -operand_->Evaluate(cell_value_getter);
+            return -result;
         }
     }
 
