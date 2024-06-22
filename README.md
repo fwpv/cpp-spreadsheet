@@ -8,9 +8,9 @@
 
 Таблица поддерживает автоматическое определение **печатной области**. Это область, в которую входят все непустые ячейки. Текст ячеек или значения в печатной области можно распечатать в выходной поток.
 
-# Настройка Среды Разработки
+## Настройка среды разработки
 
 - Настройка поддержки C++ в [VSCode](https://code.visualstudio.com/docs/cpp/config-mingw)
 - Плагин [CMake-tools для VSCode](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools)
 - Установка [ANTLR](https://www.antlr.org/) и [настройка](https://github.com/antlr/antlr4/blob/master/doc/getting-started.md)
-- Для работы ANTLR понадобится установить [виртуальную машину Java](https://www.oracle.com/java/technologies/downloads/)
+- Для работы ANTLR необходимо установить [виртуальную машину Java](https://www.oracle.com/java/technologies/downloads/)
